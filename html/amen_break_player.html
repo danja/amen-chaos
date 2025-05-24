@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amen Break Player</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            min-height: 100vh;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 600px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        
+        .subtitle {
+            color: #888;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+        
+        .controls {
+            background: #2a2a2a;
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        
+        button {
+            background: #333;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 15px 30px;
+            margin: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: #00ff00;
+            color: #1a1a1a;
+            box-shadow: 0 0 15px #00ff00;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .tempo-control {
+            margin: 20px 0;
+        }
+        
+        .tempo-control input {
+            background: #333;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 10px;
+            margin: 0 10px;
+            border-radius: 5px;
+            width: 80px;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .pattern-display {
+            background: #2a2a2a;
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            text-align: left;
+        }
+        
+        .pattern-row {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        .step {
+            display: inline-block;
+            width: 25px;
+            text-align: center;
+            margin: 0 2px;
+        }
+        
+        .active {
+            color: #ff0000;
+            text-shadow: 0 0 5px #ff0000;
+        }
+        
+        .info {
+            background: #2a2a2a;
+            border: 2px solid #888;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            font-size: 14px;
+            color: #ccc;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AMEN BREAK</h1>
+        <div class="subtitle">The Winston's "Amen Brother" (1969) - 6 seconds that changed music</div>
+        
+        <div class="controls">
+            <button id="playBtn">▶ PLAY</button>
+            <button id="stopBtn">⏹ STOP</button>
+            
+            <div class="tempo-control">
+                <label>BPM: </label>
+                <input type="number" id="tempoInput" value="136" min="60" max="200">
+                <button id="tempoBtn">SET TEMPO</button>
+            </div>
+        </div>
+        
+        <div class="pattern-display">
+            <div class="pattern-row">
+                <strong>KICK:</strong> <span id="kickPattern"></span>
+            </div>
+            <div class="pattern-row">
+                <strong>SNARE:</strong> <span id="snarePattern"></span>
+            </div>
+            <div class="pattern-row">
+                <strong>HIHAT:</strong> <span id="hihatPattern"></span>
+            </div>
+            <div class="pattern-row">
+                <strong>COWBELL:</strong> <span id="cowbellPattern"></span>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="tempo-control">
+                <label>CHAOS K: </label>
+                <input type="number" id="chaosK" value="3.8" min="1" max="4" step="0.1">
+                <label>INTENSITY: </label>
+                <input type="number" id="chaosIntensity" value="0.3" min="0" max="1" step="0.1">
+            </div>
+        </div>
+        
+        <div class="info">
+            <strong>About the Amen Break:</strong><br>
+            Originally performed by Gregory Coleman in The Winston's "Amen Brother" (1969), this 6-second drum solo became the most sampled break in music history. It's the foundation of jungle, drum & bass, and countless hip-hop tracks.
+        </div>
+    </div>
+
+    <script>
+        let isPlaying = false;
+        let currentStep = 0;
+        let loopInterval;
+        
+        // Amen break pattern (16th notes)
+        const basePattern = {
+            kick:   [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+            snare:  [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0],
+            hihat:  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            cowbell:[0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0]
+        };
+        
+        // Chaos variables
+        let chaosX = 0.5;
+        let chaosK = 3.8;
+        let chaosIntensity = 0.3;
+        
+        // Initialize Tone.js
+        const kick = new Tone.MembraneSynth({
+            pitchDecay: 0.05,
+            octaves: 10,
+            oscillator: { type: "sine" },
+            envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4 }
+        }).toDestination();
+        
+        const snare = new Tone.NoiseSynth({
+            noise: { type: "white" },
+            envelope: { attack: 0.005, decay: 0.1, sustain: 0.0 }
+        }).toDestination();
+        
+        const hihat = new Tone.MetalSynth({
+            frequency: 200,
+            envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
+            harmonicity: 5.1,
+            modulationIndex: 32,
+            resonance: 4000,
+            octaves: 1.5
+        }).toDestination();
+        
+        const cowbell = new Tone.MetalSynth({
+            frequency: 800,
+            envelope: { attack: 0.001, decay: 0.4, release: 0.1 },
+            harmonicity: 12,
+            modulationIndex: 8,
+            resonance: 800,
+            octaves: 0.8
+        }).toDestination();
+        
+        // Chaos algorithm: x[n+1] = k * x * (1 - x)
+        function chaosStep() {
+            chaosX = chaosK * chaosX * (1 - chaosX);
+            return chaosX;
+        }
+        
+        function generateChaoticPattern() {
+            const pattern = {
+                kick: [...basePattern.kick],
+                snare: [...basePattern.snare],
+                hihat: [...basePattern.hihat],
+                cowbell: [...basePattern.cowbell]
+            };
+            
+            // Apply chaos to each instrument
+            for (let i = 0; i < 16; i++) {
+                const chaos1 = chaosStep();
+                const chaos2 = chaosStep();
+                const chaos3 = chaosStep();
+                const chaos4 = chaosStep();
+                
+                // Modulate existing hits or add new ones based on chaos
+                if (basePattern.kick[i] === 0 && chaos1 < chaosIntensity * 0.3) {
+                    pattern.kick[i] = 1;
+                } else if (basePattern.kick[i] === 1 && chaos1 > 1 - chaosIntensity * 0.2) {
+                    pattern.kick[i] = 0;
+                }
+                
+                if (basePattern.snare[i] === 0 && chaos2 < chaosIntensity * 0.4) {
+                    pattern.snare[i] = 1;
+                } else if (basePattern.snare[i] === 1 && chaos2 > 1 - chaosIntensity * 0.1) {
+                    pattern.snare[i] = 0;
+                }
+                
+                if (chaos3 > 1 - chaosIntensity * 0.8) {
+                    pattern.hihat[i] = 0;
+                }
+                
+                if (chaos4 < chaosIntensity * 0.6) {
+                    pattern.cowbell[i] = 1;
+                } else if (basePattern.cowbell[i] === 1 && chaos4 > 1 - chaosIntensity * 0.3) {
+                    pattern.cowbell[i] = 0;
+                }
+            }
+            
+            return pattern;
+        }
+        
+        let currentPattern = generateChaoticPattern();
+            const kickEl = document.getElementById('kickPattern');
+            const snareEl = document.getElementById('snarePattern');
+            const hihatEl = document.getElementById('hihatPattern');
+            
+        function displayPattern() {
+            const kickEl = document.getElementById('kickPattern');
+            const snareEl = document.getElementById('snarePattern');
+            const hihatEl = document.getElementById('hihatPattern');
+            const cowbellEl = document.getElementById('cowbellPattern');
+            
+            kickEl.innerHTML = currentPattern.kick.map((hit, i) => 
+                `<span class="step ${i === currentStep ? 'active' : ''}">${hit ? '●' : '○'}</span>`
+            ).join('');
+            
+            snareEl.innerHTML = currentPattern.snare.map((hit, i) => 
+                `<span class="step ${i === currentStep ? 'active' : ''}">${hit ? '●' : '○'}</span>`
+            ).join('');
+            
+            hihatEl.innerHTML = currentPattern.hihat.map((hit, i) => 
+                `<span class="step ${i === currentStep ? 'active' : ''}">${hit ? '●' : '○'}</span>`
+            ).join('');
+            
+            cowbellEl.innerHTML = currentPattern.cowbell.map((hit, i) => 
+                `<span class="step ${i === currentStep ? 'active' : ''}">${hit ? '●' : '○'}</span>`
+            ).join('');
+        }
+        
+        function playStep() {
+            const now = Tone.now();
+            
+            if (currentPattern.kick[currentStep]) {
+                kick.triggerAttackRelease("C1", "16n", now);
+            }
+            
+            if (currentPattern.snare[currentStep]) {
+                snare.triggerAttackRelease("16n", now);
+            }
+            
+            if (currentPattern.hihat[currentStep]) {
+                hihat.triggerAttackRelease("C5", "32n", now);
+            }
+            
+            if (currentPattern.cowbell[currentStep]) {
+                cowbell.triggerAttackRelease("G5", "8n", now);
+            }
+            
+            displayPattern();
+            currentStep = (currentStep + 1) % 16;
+            
+            // Generate new chaotic pattern every 2 bars
+            if (currentStep === 0 && Math.random() < 0.5) {
+                chaosK = parseFloat(document.getElementById('chaosK').value);
+                chaosIntensity = parseFloat(document.getElementById('chaosIntensity').value);
+                currentPattern = generateChaoticPattern();
+            }
+        }
+        
+        function startLoop() {
+            if (isPlaying) return;
+            
+            Tone.start();
+            isPlaying = true;
+            currentStep = 0;
+            
+            const bpm = parseInt(document.getElementById('tempoInput').value);
+            const stepTime = (60 / bpm / 4) * 1000; // 16th notes
+            
+            loopInterval = setInterval(playStep, stepTime);
+            
+            document.getElementById('playBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+        }
+        
+        function stopLoop() {
+            if (!isPlaying) return;
+            
+            isPlaying = false;
+            clearInterval(loopInterval);
+            currentStep = 0;
+            displayPattern();
+            
+            document.getElementById('playBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+        }
+        
+        function setTempo() {
+            if (isPlaying) {
+                stopLoop();
+                setTimeout(startLoop, 100);
+            }
+        }
+        
+        // Event listeners
+        document.getElementById('playBtn').addEventListener('click', startLoop);
+        document.getElementById('stopBtn').addEventListener('click', stopLoop);
+        document.getElementById('tempoBtn').addEventListener('click', setTempo);
+        
+        document.getElementById('tempoInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                setTempo();
+            }
+        });
+        
+        // Initialize display
+        displayPattern();
+        document.getElementById('stopBtn').disabled = true;
+    </script>
+</body>
+</html>
